@@ -1,21 +1,17 @@
 <?php
 /**
- * WHMCS Sample Payment Gateway Module
+ * WHMCS Sample Merchant Gateway Module
  *
- * Payment Gateway modules allow you to integrate payment solutions with the
- * WHMCS platform.
+ * This sample file demonstrates how a merchant gateway module supporting
+ * 3D Secure Authentication, Captures and Refunds can be structured.
  *
- * This sample file demonstrates how a payment gateway module for WHMCS should
- * be structured and all supported functionality it can contain.
+ * If your merchant gateway does not support 3D Secure Authentication, you can
+ * simply omit that function and the callback file from your own module.
  *
  * Within the module itself, all functions must be prefixed with the module
  * filename, followed by an underscore, and then the function name. For this
- * example file, the filename is "gatewaymodule" and therefore all functions
- * begin "gatewaymodule_".
- *
- * If your module or third party API does not support a given function, you
- * should not define that function within your module. Only the _config
- * function is required.
+ * example file, the filename is "paypropk" and therefore all functions
+ * begin "paypropk_".
  *
  * For more information, please refer to the online documentation.
  *
@@ -29,6 +25,8 @@ if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
 
+require_once __DIR__."/paypropk/common.php";
+
 /**
  * Define module related meta data.
  *
@@ -39,10 +37,10 @@ if (!defined("WHMCS")) {
  *
  * @return array
  */
-function gatewaymodule_MetaData()
+function paypropk_MetaData()
 {
     return array(
-        'DisplayName' => 'Sample Payment Gateway Module',
+        'DisplayName' => 'PayProPk Payment Gateway',
         'APIVersion' => '1.1', // Use API Version 1.1
         'DisableLocalCreditCardInput' => true,
         'TokenisedStorage' => false,
@@ -67,163 +65,215 @@ function gatewaymodule_MetaData()
  * Examples of each field type and their possible configuration parameters are
  * provided in the sample function below.
  *
+ * @see https://developers.whmcs.com/payment-gateways/configuration/
+ *
  * @return array
  */
-function gatewaymodule_config()
+function paypropk_config()
 {
     return array(
         // the friendly display name for a payment gateway should be
         // defined here for backwards compatibility
         'FriendlyName' => array(
             'Type' => 'System',
-            'Value' => 'Sample Third Party Payment Gateway Module',
+            'Value' => 'PayPro.com.pk Payment Gateway',
         ),
         // a text field type allows for single line text input
-        'accountID' => array(
-            'FriendlyName' => 'Account ID',
+        'livePublicKey' => array(
+            'FriendlyName' => 'Live Public Key',
             'Type' => 'text',
-            'Size' => '25',
-            'Default' => '',
-            'Description' => 'Enter your account ID here',
+            'Size' => '48',
+            'Default' => 'live_public_key_01234567890123456789012345678901',
+            'Description' => 'Please visit https://PayPro.com.pk/merchant to get your keys',
         ),
-        // a password field type allows for masked text input
-        'secretKey' => array(
-            'FriendlyName' => 'Secret Key',
+        'liveSecretKey' => array(
+            'FriendlyName' => 'Live Secret Key',
             'Type' => 'password',
-            'Size' => '25',
-            'Default' => '',
-            'Description' => 'Enter secret key here',
+            'Size' => '48',
+            'Default' => 'live_secret_key_01234567890123456789012345678901',
+            'Description' => 'Please visit https://PayPro.com.pk/merchant to get your keys',
+        ),
+        'testPublicKey' => array(
+            'FriendlyName' => 'TEST Public Key',
+            'Type' => 'text',
+            'Size' => '48',
+            'Default' => 'test_public_01234567890123456789012345678901',
+            'Description' => 'Please visit https://PayPro.com.pk/merchant to get your keys',
+        ),
+        'testSecretKey' => array(
+            'FriendlyName' => 'TEST Secret Key',
+            'Type' => 'password',
+            'Size' => '48',
+            'Default' => 'test_secret_01234567890123456789012345678901',
+            'Description' => 'Please visit https://PayPro.com.pk/merchant to get your keys',
         ),
         // the yesno field type displays a single checkbox option
         'testMode' => array(
             'FriendlyName' => 'Test Mode',
             'Type' => 'yesno',
             'Description' => 'Tick to enable test mode',
-        ),
-        // the dropdown field type renders a select menu of options
-        'dropdownField' => array(
-            'FriendlyName' => 'Dropdown Field',
-            'Type' => 'dropdown',
-            'Options' => array(
-                'option1' => 'Display Value 1',
-                'option2' => 'Second Option',
-                'option3' => 'Another Option',
-            ),
-            'Description' => 'Choose one',
-        ),
-        // the radio field type displays a series of radio button options
-        'radioField' => array(
-            'FriendlyName' => 'Radio Field',
-            'Type' => 'radio',
-            'Options' => 'First Option,Second Option,Third Option',
-            'Description' => 'Choose your option!',
-        ),
-        // the textarea field type allows for multi-line text input
-        'textareaField' => array(
-            'FriendlyName' => 'Textarea Field',
-            'Type' => 'textarea',
-            'Rows' => '3',
-            'Cols' => '60',
-            'Description' => 'Freeform multi-line text input field',
-        ),
+        )
     );
 }
 
-/**
- * Payment link.
- *
- * Required by third party payment gateway modules only.
- *
- * Defines the HTML output displayed on an invoice. Typically consists of an
- * HTML form that will take the user to the payment gateway endpoint.
- *
- * @param array $params Payment Gateway Module Parameters
- *
- * @see https://developers.whmcs.com/payment-gateways/third-party-gateway/
- *
- * @return string
- */
-function gatewaymodule_link($params)
-{
-    // Gateway Configuration Parameters
-    $accountId = $params['accountID'];
-    $secretKey = $params['secretKey'];
-    $testMode = $params['testMode'];
-    $dropdownField = $params['dropdownField'];
-    $radioField = $params['radioField'];
-    $textareaField = $params['textareaField'];
+function paypropk_current_page(){
+    $filename = basename($_SERVER['SCRIPT_FILENAME']);
+    return str_replace(".PHP", "", strtoupper($filename));
+}
 
-    // Invoice Parameters
+function paypropk_processing_code(){
+    return <<<EOT
+        <h3>Processing <i class='fa fa-spin fa-circle-notch'></i></h3>
+EOT;
+}
+
+function paypropk_noinvoicepage_code(){
+    return <<<EOT
+    <div class='row'>
+    <div class='col-sm-6 col-sm-offset-3'>
+    <h3>You are being redirected to the invoice page. </h3>
+    <hr />
+    <h4>You can choose to pay either with the balance on your <strong>PayProPk Digital Wallet</strong>
+    <br />
+    or
+    <br />
+    the e-Banking options provided by your bank</h4>
+    </div>
+    </div>
+EOT;
+}
+
+function paypropk_invoicepage_code($params){
+
+    $systemUrl = $params['systemurl'];
+
     $invoiceId = $params['invoiceid'];
-    $description = $params["description"];
+    $description = htmlspecialchars(strip_tags($params["description"]));
     $amount = $params['amount'];
+    $amountInPaisa = $amount * 100;
     $currencyCode = $params['currency'];
 
-    // Client Parameters
-    $firstname = $params['clientdetails']['firstname'];
-    $lastname = $params['clientdetails']['lastname'];
-    $email = $params['clientdetails']['email'];
-    $address1 = $params['clientdetails']['address1'];
-    $address2 = $params['clientdetails']['address2'];
-    $city = $params['clientdetails']['city'];
-    $state = $params['clientdetails']['state'];
-    $postcode = $params['clientdetails']['postcode'];
-    $country = $params['clientdetails']['country'];
-    $phone = $params['clientdetails']['phonenumber'];
+    $publicKey = paypropk_get_public_key($params);
 
-    // System Parameters
-    $companyName = $params['companyname'];
-    $systemUrl = $params['systemurl'];
-    $returnUrl = $params['returnurl'];
-    $langPayNow = $params['langpaynow'];
-    $moduleDisplayName = $params['name'];
-    $moduleName = $params['paymentmethod'];
-    $whmcsVersion = $params['whmcsVersion'];
+    $moduleUrl = "modules/gateways/paypropk/";
 
-    $url = 'https://www.demopaymentgateway.com/do.payment';
+    $step2Url = $systemUrl.$moduleUrl."step2.php";
+    $invoiceUrl = $systemUrl."viewinvoice.php?id={$invoiceId}";
+    $successUrl = "{$invoiceUrl}&paymentsuccess=true";
 
-    $postfields = array();
-    $postfields['username'] = $username;
-    $postfields['invoice_id'] = $invoiceId;
-    $postfields['description'] = $description;
-    $postfields['amount'] = $amount;
-    $postfields['currency'] = $currencyCode;
-    $postfields['first_name'] = $firstname;
-    $postfields['last_name'] = $lastname;
-    $postfields['email'] = $email;
-    $postfields['address1'] = $address1;
-    $postfields['address2'] = $address2;
-    $postfields['city'] = $city;
-    $postfields['state'] = $state;
-    $postfields['postcode'] = $postcode;
-    $postfields['country'] = $country;
-    $postfields['phone'] = $phone;
-    $postfields['callback_url'] = $systemUrl . '/modules/gateways/callback/' . $moduleName . '.php';
-    $postfields['return_url'] = $returnUrl;
+    $amountInPaisa = $amount * 100;
 
-    $htmlOutput = '<form method="post" action="' . $url . '">';
-    foreach ($postfields as $k => $v) {
-        $htmlOutput .= '<input type="hidden" name="' . $k . '" value="' . urlencode($v) . '" />';
+    $processingCode = paypropk_processing_code();
+
+    $buttonCSS = "";
+
+    return <<<EOT
+    <script src="https://PayPro.com.pk/static/khalti-checkout.js"></script>
+    <script type='text/javascript'>
+    function ajaxpost(payload){
+        xhr = new XMLHttpRequest();
+        xhr.open('POST', '{$step2Url}');
+        xhr.onload = function() {
+            console.log("Response Received - " + xhr.status, " -> ", xhr.responseText);
+            var resp = xhr.responseText;
+            document.getElementById('paypropk-button-content').style.display="none";
+            document.getElementById('paypropk-processing').style.display="";
+            if (xhr.status != 200) {
+                document.getElementById('paypropk-processing').innerHTML = resp;
+                alert("Payment processing failed");
+            }else{
+                document.getElementById('paypropk-processing').innerHTML = "<h4>Thank you. We have received your payment.</h4>";
+                window.setTimeout(function(){
+                    location.href="{$successUrl}";
+                }, 300);
+            }
+        };
+        xhr.send(JSON.stringify(payload));
     }
-    $htmlOutput .= '<input type="submit" value="' . $langPayNow . '" />';
-    $htmlOutput .= '</form>';
+    </script>
+    <div class='row' id='paypropk-button-wrapper'>
+        <div class='col-sm-12' style='padding:2em;'>
+            <div class='row' id='paypropk-processing' style='display:none'>
+                <div class='col-sm-12'>
+                    {$processingCode}
+                </div>
+            </div>
+            <div class='row' id='paypropk-button-content'>
+                <div class='col-sm-5'>
+                    <div class='thumbnail' style='border:0px;box-shadow:none; margin-top:2em;'>
+                        <img src='https://khalti-mediakit.s3.ap-south-1.amazonaws.com/brand/khalti-logo-color.200.png' />
+                        <!--<img src='https://d7vw40z4bofef.cloudfront.net/static/khalti_logo_alt.png' /> -->
+                    </div>
+                </div>
+                <div class='col-sm-7 text-left' style='border-left:1px solid #f9f9f9'>
+                    <small>You can pay with PayProPk account or other e-Banking Options</small>
+                    <br />
+                    <br />
+                    <button id='khalti-payment-button' onclick='javascript:void(0)' class='btn btn-primary btn-large' style='{$buttonCSS}'>
+                        {$params['langpaynow']}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var config = {
+            "publicKey": "{$publicKey}",
+            "productIdentity": "Invoice#{$invoiceId} - [{$currencyCode}{$amount}]",
+            "productName": "{$description}",
+            "productUrl": "{$invoiceUrl}",
+            "eventHandler": {
+                onSuccess (payload) {
+                    console.log(payload);
+                    var confirmationPayload = payload;
+                    confirmationPayload['invoiceId'] = '{$invoiceId}';
+                    ajaxpost(confirmationPayload);
+                },
+                onError (error) {
+                    alert("Payment processing failed");
+                    console.log(error);
+                },
+                onClose () {
+                    document.getElementById('paypropk-button-content').style.display="";
+                    document.getElementById('paypropk-processing').style.display="none";
+                    console.log('widget is closing');
+                }
+            }
+        };
+        var checkout = new PayProPkCheckout(config);
+        var btn = document.getElementById("khalti-payment-button");
+        btn.onclick = function () {
+            document.getElementById('paypropk-button-content').style.display="none";
+            document.getElementById('paypropk-processing').style.display="";
+            checkout.show({amount: {$amountInPaisa}});
+        }
+    </script>
+EOT;
+}
 
-    return $htmlOutput;
+function paypropk_link($params) {
+    $currentPage = paypropk_current_page();
+    if($currentPage !== "VIEWINVOICE"){
+        // Wait for the page to be redirected to the invoice page.
+        return paypropk_noinvoicepage_code();
+    }
+    return  paypropk_invoicepage_code($params);
 }
 
 /**
  * Refund transaction.
+ * Yet to be implemented.
  *
  * Called when a refund is requested for a previously successful transaction.
  *
  * @param array $params Payment Gateway Module Parameters
  *
- * @see https://developers.whmcs.com/payment-gateways/refunds/
- *
  * @return array Transaction response status
  */
-function gatewaymodule_refund($params)
+function paypropk_refund($params)
 {
+    return false;
+
     // Gateway Configuration Parameters
     $accountId = $params['accountID'];
     $secretKey = $params['secretKey'];
@@ -268,49 +318,5 @@ function gatewaymodule_refund($params)
         'transid' => $refundTransactionId,
         // Optional fee amount for the fee value refunded
         'fees' => $feeAmount,
-    );
-}
-
-/**
- * Cancel subscription.
- *
- * If the payment gateway creates subscriptions and stores the subscription
- * ID in tblhosting.subscriptionid, this function is called upon cancellation
- * or request by an admin user.
- *
- * @param array $params Payment Gateway Module Parameters
- *
- * @see https://developers.whmcs.com/payment-gateways/subscription-management/
- *
- * @return array Transaction response status
- */
-function gatewaymodule_cancelSubscription($params)
-{
-    // Gateway Configuration Parameters
-    $accountId = $params['accountID'];
-    $secretKey = $params['secretKey'];
-    $testMode = $params['testMode'];
-    $dropdownField = $params['dropdownField'];
-    $radioField = $params['radioField'];
-    $textareaField = $params['textareaField'];
-
-    // Subscription Parameters
-    $subscriptionIdToCancel = $params['subscriptionID'];
-
-    // System Parameters
-    $companyName = $params['companyname'];
-    $systemUrl = $params['systemurl'];
-    $langPayNow = $params['langpaynow'];
-    $moduleDisplayName = $params['name'];
-    $moduleName = $params['paymentmethod'];
-    $whmcsVersion = $params['whmcsVersion'];
-
-    // perform API call to cancel subscription and interpret result
-
-    return array(
-        // 'success' if successful, any other value for failure
-        'status' => 'success',
-        // Data to be recorded in the gateway log - can be a string or array
-        'rawdata' => $responseData,
     );
 }
