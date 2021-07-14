@@ -1,0 +1,20 @@
+{
+  "schema": "1.0",
+  "type": "whmcs-gateways",
+  "name": "paypropk",
+  "license": "proprietary",
+  "category": "payments",
+  "description": {
+    "name": "PayPro Pakistan Hosted Payment",
+    "tagline": "A third party gateway. ."
+  },
+  "support": {
+    "docs_url": "https:\/\/paypro.com.pk"
+  },
+  "authors": [
+    {
+      "name": "Boxygen",
+      "homepage": "https:\/\/www.boxygen.pk\/"
+    }
+  ]
+}
